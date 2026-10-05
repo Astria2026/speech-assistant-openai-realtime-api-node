@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import WebSocket from 'ws';
 import dotenv from 'dotenv';
-import fastifyFormBody from '@fastify/formbody';
+import formbody from '@fastify/formbody';
 import fastifyWs from '@fastify/websocket';
 
 dotenv.config();
@@ -9,268 +9,103 @@ dotenv.config();
 const { OPENAI_API_KEY } = process.env;
 
 if (!OPENAI_API_KEY) {
-  console.error('Missing OPENAI_API_KEY');
-  process.exit(1);
+  throw new Error('Missing OPENAI_API_KEY');
 }
 
-const fastify = Fastify({ logger: false });
+const app = Fastify({ logger: false });
 
-fastify.register(fastifyFormBody);
-fastify.register(fastifyWs);
+app.register(formbody);
+app.register(fastifyWs);
 
 
 // ============================================================
 // ASTRIA AI VOICE
-// V5 ENGLISH MASTER
+// V6 SIMPLE RECEPTION MASTER
 // ============================================================
 
-const PORT = Number(process.env.PORT || 5050);
+const PORT = Number(
+  process.env.PORT || 5050
+);
 
 const MODEL =
   process.env.OPENAI_REALTIME_MODEL ||
   'gpt-realtime-1.5';
 
-const VOICE =
-  process.env.OPENAI_REALTIME_VOICE ||
+// Restore original gentle female menu voice
+const MENU_VOICE =
+  'Google.en-US-Chirp3-HD-Aoede';
+
+// AI conversation voice
+const AI_VOICE =
   'shimmer';
 
-// Slower, softer AI delivery
-const AI_VOICE_SPEED = 0.82;
-
-// Stable Twilio English female voice
-const MENU_VOICE = 'Polly.Joanna';
-
-// Slower IVR menu and department introductions
-const MENU_RATE = '85%';
-
-const SESSION_TIMEOUT_MS = 10000;
-const MAX_PENDING_AUDIO_FRAMES = 300;
-
 
 // ============================================================
-// COMPANY INFORMATION
-// ============================================================
-
-const COMPANY = {
-  brandName: 'Astria',
-
-  legalName: 'Astria Corp.',
-
-  website: 'https://www.goastria.com',
-
-  email: 'info@goastria.com',
-
-  phone: '+1-888-987-8767',
-
-  address:
-    '108 W 39th Street Ste 1006, New York, NY 10018, United States'
-};
-
-
-// ============================================================
-// BUSINESS DEPARTMENTS
+// BUSINESS SERVICES
 // ============================================================
 
 const SERVICES = {
 
-  // ----------------------------------------------------------
-  // 1 — AVIATION
-  // ----------------------------------------------------------
-
   '1': {
     key: 'aviation',
-
     name: 'Aviation',
 
     intro:
-      'Astria Aviation supports aviation industry relationships, strategic partnerships, international connections, and business development opportunities. Please tell me how I may assist you today.',
-
-    scope: `
-Astria develops aviation-related strategic relationships,
-commercial partnerships,
-business development opportunities,
-and international industry connections.
-
-Do not promise airline fares,
-upgrades,
-discounts,
-flight availability,
-or airline benefits
-unless specifically confirmed by Astria.
-`
+      'Astria Aviation connects aviation industry relationships, strategic partnerships, international resources, and business development opportunities.'
   },
 
 
-  // ----------------------------------------------------------
-  // 2 — SPACE AND AEROSPACE
-  // ----------------------------------------------------------
-
   '2': {
-    key: 'space-aerospace',
-
+    key: 'space',
     name: 'Space and Aerospace',
 
     intro:
-      'Astria Space and Aerospace supports strategic partnerships, international industry relationships, and business development across the global space and aerospace ecosystem. Please tell me how I may assist you today.',
-
-    scope: `
-Astria supports strategic relationships,
-partnerships,
-business development,
-and opportunity development
-across the space and aerospace ecosystem.
-
-Do not claim that Astria manufactures spacecraft,
-launches rockets,
-operates satellites,
-or represents NASA
-or another government agency
-unless specifically confirmed.
-`
+      'Astria Space and Aerospace supports strategic partnerships, international industry relationships, and business development across the global space and aerospace sector.'
   },
 
 
-  // ----------------------------------------------------------
-  // 3 — AI TECHNOLOGY
-  // ----------------------------------------------------------
-
   '3': {
-    key: 'ai-technology',
-
+    key: 'ai',
     name: 'AI Technology',
 
     intro:
-      'Astria AI Technology focuses on strategic technology partnerships, enterprise applications, business integration, and international technology opportunities. Please tell me how I may assist you today.',
-
-    scope: `
-Astria explores AI technology partnerships,
-enterprise applications,
-business integration opportunities,
-and strategic technology relationships.
-
-Do not claim that a specific AI product,
-integration,
-or implementation is available
-unless specifically confirmed.
-`
+      'Astria AI Technology focuses on strategic technology partnerships, enterprise applications, business integration, and international technology opportunities.'
   },
 
 
-  // ----------------------------------------------------------
-  // 4 — SPORTS HOSPITALITY
-  // ----------------------------------------------------------
-
   '4': {
-    key: 'sports-hospitality',
-
+    key: 'sports',
     name: 'Sports Hospitality',
 
     intro:
-      'Astria Sports Hospitality focuses on premium sports hospitality, major event opportunities, corporate experiences, and strategic partnerships. Please tell me how I may assist you today.',
-
-    scope: `
-Astria works with premium sports hospitality,
-major-event opportunities,
-strategic partnerships,
-corporate experiences,
-and related international business opportunities.
-
-Never guarantee tickets,
-suites,
-hospitality inventory,
-credentials,
-event access,
-pricing,
-or availability
-unless specifically confirmed.
-`
+      'Astria Sports Hospitality focuses on premium sports hospitality, major event opportunities, corporate experiences, and strategic partnerships.'
   },
 
 
-  // ----------------------------------------------------------
-  // 5 — GOVERNMENT PROCUREMENT
-  // ----------------------------------------------------------
-
   '5': {
-    key: 'government-procurement',
-
+    key: 'government',
     name: 'Government Procurement Services',
 
     intro:
-      'Astria Government Procurement Services assists with government supplier registration, application preparation and submission, and basic supplemental document follow-up. Please tell me how I may assist you today.',
-
-    scope: `
-Astria provides assistance
-with government supplier and vendor registration,
-application preparation and submission,
-and basic supplemental-document follow-up.
-
-The service does not include
-finding government projects,
-preparing or submitting bids unless separately agreed,
-guaranteeing contract awards,
-or providing legal or tax services.
-
-Never promise a government contract,
-award,
-approval,
-certification,
-or registration outcome.
-`
+      'Astria Government Procurement Services assists with government supplier registration, application preparation and submission, and basic supplemental document follow-up.'
   },
 
-
-  // ----------------------------------------------------------
-  // 6 — BUSINESS COOPERATION
-  // ----------------------------------------------------------
 
   '6': {
-    key: 'business-cooperation',
-
-    name: 'Business Cooperation and Global Opportunities',
+    key: 'business',
+    name: 'Business Cooperation',
 
     intro:
-      'Astria connects innovation, capital, talent, organizations, and opportunities across industries and international markets. Please tell me how I may assist you today.',
-
-    scope: `
-Astria connects innovation,
-capital,
-and talent
-across industries and borders.
-
-Astria works with organizations and investors
-to identify opportunities,
-build strategic partnerships,
-support international expansion,
-and create long-term value.
-
-Astria bridges New York
-and global markets
-through relationships,
-industry insight,
-and strategic connections.
-`
+      'Astria connects innovation, capital, talent, organizations, and opportunities across industries and international markets.'
   },
 
-
-  // ----------------------------------------------------------
-  // 0 — GENERAL ASSISTANCE
-  // ----------------------------------------------------------
 
   '0': {
     key: 'general',
-
     name: 'General Assistance',
 
     intro:
-      'You have reached Astria General Assistance. Astria works across aviation, space and aerospace, AI technology, sports hospitality, government procurement services, and global business cooperation. Please tell me how I may assist you today.',
-
-    scope: `
-Help the caller understand Astria,
-identify the most relevant business area,
-and answer general questions
-using only verified company information.
-`
+      'Astria provides general assistance across aviation, space and aerospace, AI technology, sports hospitality, government procurement services, and business cooperation.'
   }
 
 };
@@ -288,292 +123,10 @@ const SERVICE_BY_KEY =
 
 
 // ============================================================
-// AI KNOWLEDGE AND SERVICE STYLE
+// HELPERS
 // ============================================================
 
-function buildInstructions(service) {
-
-  return `
-
-You are Astria's professional AI voice assistant.
-
-
-COMPANY IDENTITY
-
-Public-facing company name:
-Astria.
-
-Legal entity,
-only when specifically asked:
-Astria Corp.
-
-Never claim to be a human employee.
-
-If directly asked,
-clearly say you are Astria's AI voice assistant.
-
-
-COMPANY OVERVIEW
-
-Astria is a New York-based
-global business platform
-connecting innovation,
-capital,
-talent,
-organizations,
-and opportunities
-across industries
-and international markets.
-
-Astria connects innovation,
-capital,
-and talent
-across industries and borders.
-
-We work with visionary organizations
-and investors
-to identify opportunities,
-build strategic partnerships,
-and drive sustainable growth.
-
-Our global network
-and industry expertise
-help open doors,
-accelerate expansion,
-and create lasting value.
-
-Astria bridges New York
-and the world,
-combining local insight
-with global connections.
-
-We work across industries
-and markets
-where relationships matter most.
-
-By connecting
-the right partners,
-resources,
-and opportunities,
-we help organizations grow,
-expand internationally,
-and pursue long-term success.
-
-
-CORE BUSINESS AREAS
-
-1. Aviation
-
-2. Space and Aerospace
-
-3. AI Technology
-
-4. Sports Hospitality
-
-5. Government Procurement Services
-
-6. Business Cooperation and Global Opportunities
-
-
-Website:
-${COMPANY.website}
-
-Email:
-${COMPANY.email}
-
-Telephone:
-${COMPANY.phone}
-
-New York office:
-${COMPANY.address}
-
-
-CURRENT DEPARTMENT
-
-${service.name}
-
-
-DEPARTMENT INFORMATION
-
-${service.scope}
-
-
-SERVICE STYLE
-
-Sound:
-
-warm,
-
-gentle,
-
-calm,
-
-polished,
-
-attentive,
-
-patient,
-
-professional,
-
-and discreet.
-
-
-Your service style
-should resemble
-premium international airline
-cabin crew service.
-
-
-Speak clearly.
-
-Speak slightly slower
-than normal.
-
-Keep most answers
-to one to three short sentences
-unless the caller asks
-for more detail.
-
-Ask one concise
-clarifying question
-at a time.
-
-Let the caller finish speaking.
-
-Do not interrupt unnecessarily.
-
-Never sound robotic.
-
-Never sound rushed.
-
-Never sound theatrical.
-
-Never sound overly casual.
-
-Never sound excessively enthusiastic.
-
-Never sound salesy.
-
-
-LANGUAGE
-
-Begin in English.
-
-If the caller clearly speaks
-or requests another language,
-respond naturally
-in that language when possible.
-
-Keep the company name
-Astria unchanged.
-
-
-ACCURACY
-
-Never invent
-or imply unconfirmed:
-
-partnerships,
-
-contracts,
-
-government approvals,
-
-government awards,
-
-project awards,
-
-airline benefits,
-
-ticket availability,
-
-hospitality availability,
-
-pricing,
-
-certifications,
-
-legal conclusions,
-
-or tax conclusions.
-
-
-Never promise an outcome.
-
-
-If information is not confirmed,
-explain that
-the Astria team
-can provide further details.
-
-
-HUMAN ASSISTANCE
-
-This version does not perform
-a live human transfer.
-
-It does not automatically create:
-
-tickets,
-
-reservations,
-
-applications,
-
-orders,
-
-emails,
-
-or formal requests.
-
-
-Never falsely claim
-that you:
-
-transferred a call,
-
-sent an email,
-
-submitted an application,
-
-created a reservation,
-
-placed an order,
-
-or recorded a formal request.
-
-
-If the caller requests
-human assistance,
-provide:
-
-${COMPANY.email}
-
-
-CLOSING
-
-When the conversation
-is complete,
-close politely
-and concisely.
-
-Example:
-
-Thank you for contacting Astria.
-We appreciate your call
-and look forward to assisting you.
-
-`;
-
-}
-
-
-// ============================================================
-// XML HELPERS
-// ============================================================
-
-function xmlEscape(value = '') {
+function escapeXml(value = '') {
 
   return String(value)
 
@@ -590,47 +143,28 @@ function xmlEscape(value = '') {
 }
 
 
-function getPublicHost(request) {
+function getHost(request) {
 
-  const forwardedHost =
+  return String(
+
     request.headers[
       'x-forwarded-host'
-    ];
+    ] ||
 
+    request.headers.host ||
 
-  const rawHost =
-    String(
-      forwardedHost ||
-      request.headers.host ||
-      ''
-    )
-      .split(',')[0]
-      .trim();
+    ''
 
+  )
 
-  if (
-    !/^[a-zA-Z0-9.-]+(?::\d+)?$/.test(
-      rawHost
-    )
-  ) {
+    .split(',')[0]
 
-    throw new Error(
-      'Invalid public host'
-    );
-
-  }
-
-
-  return rawHost;
+    .trim();
 
 }
 
 
-// ============================================================
-// TWILIO SAY
-// ============================================================
-
-function sayBlock(text) {
+function say(text) {
 
   return `
 
@@ -638,8 +172,8 @@ function sayBlock(text) {
   voice="${MENU_VOICE}"
   language="en-US">
 
-  <prosody rate="${MENU_RATE}">
-    ${xmlEscape(text)}
+  <prosody rate="88%">
+    ${escapeXml(text)}
   </prosody>
 
 </Say>
@@ -651,41 +185,34 @@ function sayBlock(text) {
 
 // ============================================================
 // MAIN MENU
-// NO CHINESE MENU
-// NO NUMBER 9
 // ============================================================
 
-function buildMainMenuTwiml(request) {
-
-  const host =
-    getPublicHost(request);
-
+function buildMenu(request) {
 
   const action =
-    `https://${host}/menu`;
+    `https://${getHost(request)}/menu`;
 
 
-  const menuText = [
+  const text =
+    'Thank you for calling Astria. ' +
 
-    'Thank you for calling Astria.',
+    'For Aviation, press 1. ' +
 
-    'For Aviation, press 1.',
+    'For Space and Aerospace, press 2. ' +
 
-    'For Space and Aerospace, press 2.',
+    'For AI Technology, press 3. ' +
 
-    'For AI Technology, press 3.',
+    'For Sports Hospitality, press 4. ' +
 
-    'For Sports Hospitality, press 4.',
+    'For Government Procurement Services, press 5. ' +
 
-    'For Government Procurement Services, press 5.',
+    'For Business Cooperation, press 6. ' +
 
-    'For Business Cooperation, press 6.',
+    'To leave a voice message, press 7. ' +
 
-    'For General Assistance, press 0.',
+    'For General Assistance, press 0. ' +
 
-    'To hear this menu again, press 8.'
-
-  ].join(' ');
+    'To hear this menu again, press 8.';
 
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -696,11 +223,11 @@ function buildMainMenuTwiml(request) {
     input="dtmf"
     numDigits="1"
     timeout="6"
-    action="${xmlEscape(action)}"
+    action="${escapeXml(action)}"
     method="POST"
     actionOnEmptyResult="true">
 
-    ${sayBlock(menuText)}
+    ${say(text)}
 
   </Gather>
 
@@ -710,82 +237,43 @@ function buildMainMenuTwiml(request) {
 
 
 // ============================================================
-// INVALID SELECTION
+// DEPARTMENT INTRODUCTION + AI
 // ============================================================
 
-function buildInvalidSelectionTwiml(request) {
-
-  const host =
-    getPublicHost(request);
-
-
-  const redirect =
-    `https://${host}/incoming-call`;
-
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-
-<Response>
-
-  ${sayBlock(
-    'Sorry, that selection is not available. Please try again.'
-  )}
-
-  <Redirect method="POST">
-    ${xmlEscape(redirect)}
-  </Redirect>
-
-</Response>`;
-
-}
-
-
-// ============================================================
-// DEPARTMENT INTRODUCTION + AI CONNECTION
-//
-// IMPORTANT:
-// Twilio first speaks the department introduction.
-// Only AFTER that introduction finishes
-// does Twilio enter the AI Media Stream.
-// ============================================================
-
-function buildConnectTwiml(
+function buildConnect(
   request,
   service
 ) {
 
   const host =
-    getPublicHost(request);
+    getHost(request);
 
 
-  const websocketUrl =
-    `wss://${host}/media-stream`;
-
-
-  const fallback =
-    `We are sorry. The Astria AI assistant is temporarily unavailable. Please email ${COMPANY.email} or call again later.`;
+  const introduction =
+    service.intro +
+    ' Please tell me how I may assist you today.';
 
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 
 <Response>
 
-  ${sayBlock(service.intro)}
+  ${say(introduction)}
 
-  <Connect>
+  <Connect
+    action="https://${host}/after-ai"
+    method="POST">
 
     <Stream
-      url="${xmlEscape(websocketUrl)}">
+      url="wss://${host}/media-stream">
 
       <Parameter
         name="service"
-        value="${xmlEscape(service.key)}" />
+        value="${escapeXml(service.key)}" />
 
     </Stream>
 
   </Connect>
-
-  ${sayBlock(fallback)}
 
 </Response>`;
 
@@ -793,27 +281,167 @@ function buildConnectTwiml(
 
 
 // ============================================================
-// HEALTH ROUTES
+// VOICEMAIL
 // ============================================================
 
-fastify.get(
+function buildVoicemail(request) {
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+
+<Response>
+
+  ${say(
+    'Please leave your name, telephone number, email address if available, and a brief message after the tone. A member of the Astria team will follow up with you.'
+  )}
+
+  <Record
+    action="https://${getHost(request)}/voicemail-done"
+    method="POST"
+    maxLength="120"
+    playBeep="true" />
+
+</Response>`;
+
+}
+
+
+// ============================================================
+// AI INSTRUCTIONS
+// ============================================================
+
+function buildInstructions(
+  service
+) {
+
+  return `
+
+You are Astria's professional AI telephone assistant.
+
+Astria is a New York based global business platform.
+
+Astria works across:
+
+Aviation.
+
+Space and Aerospace.
+
+AI Technology.
+
+Sports Hospitality.
+
+Government Procurement Services.
+
+Business Cooperation.
+
+
+The caller selected:
+
+${service.name}
+
+
+Speak in a warm,
+gentle,
+calm,
+polished,
+professional service style.
+
+Your manner should resemble
+premium international airline cabin crew.
+
+Speak slightly slower than normal.
+
+Keep answers concise.
+
+Usually answer in
+one to three sentences.
+
+Ask one question at a time.
+
+Do not interrupt unnecessarily.
+
+
+Do not claim to be human.
+
+Do not invent:
+
+partnerships,
+
+contracts,
+
+government approvals,
+
+government awards,
+
+prices,
+
+availability,
+
+certifications,
+
+legal conclusions,
+
+tax conclusions,
+
+or guaranteed results.
+
+
+There is currently
+no live transfer
+to a personal telephone.
+
+
+If the caller asks
+to speak with a human,
+representative,
+agent,
+staff member,
+or customer service person,
+
+say:
+
+"Our consultation volume
+is currently high,
+so live assistance
+may not be immediately available.
+
+Our team can follow up
+with you by phone or email.
+
+You may also leave us
+a voice message,
+and a member of the Astria team
+will get back to you."
+
+
+Astria email:
+
+info@goastria.com
+
+
+Astria website:
+
+https://www.goastria.com
+
+
+Astria telephone:
+
++1-888-987-8767
+
+`;
+
+}
+
+
+// ============================================================
+// BASIC ROUTES
+// ============================================================
+
+app.get(
   '/',
   async () => ({
     status: 'ok',
     service: 'Astria AI Voice',
-    version: 'V5-English'
-  })
-);
-
-
-fastify.get(
-  '/health',
-  async () => ({
-    status: 'healthy',
-    company: 'Astria',
-    model: MODEL,
-    voice: VOICE,
-    aiVoiceSpeed: AI_VOICE_SPEED
+    version: 'V6 Simple Reception'
   })
 );
 
@@ -822,46 +450,19 @@ fastify.get(
 // INCOMING CALL
 // ============================================================
 
-fastify.all(
+app.all(
   '/incoming-call',
+
   async (
     request,
     reply
   ) => {
 
-    try {
-
-      console.log(
-        'Incoming Astria call: main menu'
+    reply
+      .type('text/xml')
+      .send(
+        buildMenu(request)
       );
-
-
-      reply
-        .type('text/xml')
-        .send(
-          buildMainMenuTwiml(
-            request
-          )
-        );
-
-    }
-
-    catch (error) {
-
-      console.error(
-        'Incoming menu error:',
-        error
-      );
-
-
-      reply
-        .code(500)
-        .type('text/plain')
-        .send(
-          'Configuration error'
-        );
-
-    }
 
   }
 );
@@ -871,157 +472,140 @@ fastify.all(
 // MENU SELECTION
 // ============================================================
 
-fastify.all(
+app.all(
   '/menu',
+
   async (
     request,
     reply
   ) => {
 
-    try {
+    const digit =
+      String(
 
-      const digit =
-        String(
+        request.body?.Digits ??
 
-          request.body?.Digits ??
-          request.query?.Digits ??
-          ''
+        request.query?.Digits ??
 
-        ).trim();
+        ''
 
-
-      console.log(
-        `Menu digit received: ${digit || '(none)'}`
-      );
+      ).trim();
 
 
-      // No selection
-      if (!digit) {
+    // Repeat menu
+    if (
+      digit === '8'
+    ) {
 
-        console.log(
-          'No digit received. Connecting General Assistance.'
-        );
-
-
-        reply
-          .type('text/xml')
-          .send(
-
-            buildConnectTwiml(
-
-              request,
-
-              SERVICES['0']
-
-            )
-
-          );
-
-
-        return;
-
-      }
-
-
-      // Repeat menu
-      if (
-        digit === '8'
-      ) {
-
-        reply
-          .type('text/xml')
-          .send(
-
-            buildMainMenuTwiml(
-              request
-            )
-
-          );
-
-
-        return;
-
-      }
-
-
-      // Invalid number
-      if (
-
-        !Object.prototype.hasOwnProperty.call(
-          SERVICES,
-          digit
-        )
-
-      ) {
-
-        reply
-          .type('text/xml')
-          .send(
-
-            buildInvalidSelectionTwiml(
-              request
-            )
-
-          );
-
-
-        return;
-
-      }
-
-
-      const service =
-        SERVICES[digit];
-
-
-      console.log(
-        `Department selected: ${service.name}`
-      );
-
-
-      reply
+      return reply
         .type('text/xml')
         .send(
-
-          buildConnectTwiml(
-
-            request,
-
-            service
-
-          )
-
+          buildMenu(request)
         );
 
     }
 
-    catch (error) {
 
-      console.error(
-        'Menu selection error:',
-        error
-      );
+    // Leave voicemail
+    if (
+      digit === '7'
+    ) {
 
-
-      reply
-        .code(500)
-        .type('text/plain')
+      return reply
+        .type('text/xml')
         .send(
-          'Configuration error'
+          buildVoicemail(request)
         );
 
     }
+
+
+    // Selected department
+    const service =
+      SERVICES[digit] ||
+      SERVICES['0'];
+
+
+    return reply
+      .type('text/xml')
+      .send(
+
+        buildConnect(
+          request,
+          service
+        )
+
+      );
 
   }
 );
+
+
 // ============================================================
-// TWILIO MEDIA STREAM <-> OPENAI REALTIME
+// IF AI STREAM ENDS
+// GO TO VOICEMAIL INSTEAD OF HANGING UP
 // ============================================================
 
-fastify.register(
-  async function (app) {
+app.all(
+  '/after-ai',
 
-    app.get(
+  async (
+    request,
+    reply
+  ) => {
+
+    reply
+      .type('text/xml')
+      .send(
+        buildVoicemail(request)
+      );
+
+  }
+);
+
+
+// ============================================================
+// VOICEMAIL COMPLETE
+// ============================================================
+
+app.all(
+  '/voicemail-done',
+
+  async (
+    request,
+    reply
+  ) => {
+
+    reply
+      .type('text/xml')
+      .send(
+
+        `<?xml version="1.0" encoding="UTF-8"?>
+
+<Response>
+
+  ${say(
+    'Thank you. Your message has been received. A member of the Astria team will follow up with you as soon as possible. Goodbye.'
+  )}
+
+</Response>`
+
+      );
+
+  }
+);
+
+
+// ============================================================
+// TWILIO <-> OPENAI REALTIME
+// ============================================================
+
+app.register(
+  async function (
+    server
+  ) {
+
+    server.get(
 
       '/media-stream',
 
@@ -1029,48 +613,38 @@ fastify.register(
         websocket: true
       },
 
-      connection => {
+      socket => {
 
 
-        console.log(
-          'Twilio Media Stream connected'
-        );
+        let streamSid =
+          null;
 
-
-        // ----------------------------------------------------
-        // CALL STATE
-        // ----------------------------------------------------
-
-        let streamSid = null;
-
-        let latestMediaTimestamp = 0;
-
-        let responseStartTimestampTwilio = null;
-
-        let lastAssistantItem = null;
-
-        let markQueue = [];
-
-        let twilioStarted = false;
-
-        let openAiConnected = false;
-
-        let sessionConfigured = false;
 
         let selectedService =
           SERVICES['0'];
 
-        let sessionTimeout = null;
+
+        let twilioStarted =
+          false;
 
 
-        const pendingAudio = [];
+        let openAiStarted =
+          false;
+
+
+        let sessionReady =
+          false;
+
+
+        const pendingAudio =
+          [];
 
 
         // ----------------------------------------------------
-        // OPENAI REALTIME CONNECTION
+        // OPENAI CONNECTION
         // ----------------------------------------------------
 
-        const openAiWs =
+        const openai =
           new WebSocket(
 
             `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(MODEL)}`,
@@ -1089,127 +663,17 @@ fastify.register(
           );
 
 
-        // ----------------------------------------------------
-        // CONNECTION STATUS
-        // ----------------------------------------------------
+        function sendToOpenAI(
+          data
+        ) {
 
-        function twilioIsOpen() {
-
-          return (
-            connection.readyState ===
+          if (
+            openai.readyState ===
             WebSocket.OPEN
-          );
-
-        }
-
-
-        function openAiIsOpen() {
-
-          return (
-            openAiWs.readyState ===
-            WebSocket.OPEN
-          );
-
-        }
-
-
-        // ----------------------------------------------------
-        // SEND TO TWILIO
-        // ----------------------------------------------------
-
-        function sendToTwilio(payload) {
-
-          if (
-            !twilioIsOpen()
           ) {
 
-            return false;
-
-          }
-
-
-          connection.send(
-            JSON.stringify(
-              payload
-            )
-          );
-
-
-          return true;
-
-        }
-
-
-        // ----------------------------------------------------
-        // SEND TO OPENAI
-        // ----------------------------------------------------
-
-        function sendToOpenAI(payload) {
-
-          if (
-            !openAiIsOpen()
-          ) {
-
-            return false;
-
-          }
-
-
-          openAiWs.send(
-            JSON.stringify(
-              payload
-            )
-          );
-
-
-          return true;
-
-        }
-
-
-        // ----------------------------------------------------
-        // SESSION TIMER
-        // ----------------------------------------------------
-
-        function clearSessionTimer() {
-
-          if (
-            sessionTimeout
-          ) {
-
-            clearTimeout(
-              sessionTimeout
-            );
-
-
-            sessionTimeout = null;
-
-          }
-
-        }
-
-
-        // ----------------------------------------------------
-        // FALLBACK
-        // ----------------------------------------------------
-
-        function closeForFallback(reason) {
-
-          console.error(
-            `Closing AI stream for fallback: ${reason}`
-          );
-
-
-          clearSessionTimer();
-
-
-          if (
-            twilioIsOpen()
-          ) {
-
-            connection.close(
-              1011,
-              'AI backend unavailable'
+            openai.send(
+              JSON.stringify(data)
             );
 
           }
@@ -1218,18 +682,18 @@ fastify.register(
 
 
         // ----------------------------------------------------
-        // CONFIGURE OPENAI REALTIME SESSION
+        // START AI SESSION
         // ----------------------------------------------------
 
-        function configureSession() {
+        function startSession() {
 
           if (
 
             !twilioStarted ||
 
-            !openAiConnected ||
+            !openAiStarted ||
 
-            sessionConfigured
+            sessionReady
 
           ) {
 
@@ -1238,20 +702,18 @@ fastify.register(
           }
 
 
-          console.log(
+          sendToOpenAI({
 
-            `Configuring Astria AI session: ${selectedService.name}`
-
-          );
-
-
-          const sessionUpdate = {
-
-            type: 'session.update',
+            type:
+              'session.update',
 
             session: {
 
-              type: 'realtime',
+              type:
+                'realtime',
+
+              model:
+                MODEL,
 
               output_modalities: [
                 'audio'
@@ -1304,10 +766,10 @@ fastify.register(
                   },
 
                   voice:
-                    VOICE,
+                    AI_VOICE,
 
                   speed:
-                    AI_VOICE_SPEED
+                    0.88
 
                 }
 
@@ -1315,214 +777,24 @@ fastify.register(
 
             }
 
-          };
-
-
-          sessionTimeout =
-            setTimeout(
-
-              () => {
-
-                if (
-                  !sessionConfigured
-                ) {
-
-                  closeForFallback(
-                    'OpenAI session setup timed out'
-                  );
-
-                }
-
-              },
-
-              SESSION_TIMEOUT_MS
-
-            );
-
-
-          sendToOpenAI(
-            sessionUpdate
-          );
-
-        }
-
-
-        // ----------------------------------------------------
-        // FLUSH BUFFERED CALLER AUDIO
-        // ----------------------------------------------------
-
-        function flushPendingAudio() {
-
-          while (
-
-            pendingAudio.length > 0 &&
-
-            openAiIsOpen()
-
-          ) {
-
-            sendToOpenAI({
-
-              type:
-                'input_audio_buffer.append',
-
-              audio:
-                pendingAudio.shift()
-
-            });
-
-          }
-
-        }
-
-
-        // ----------------------------------------------------
-        // TWILIO MARK
-        // ----------------------------------------------------
-
-        function sendMark() {
-
-          if (
-            !streamSid
-          ) {
-
-            return;
-
-          }
-
-
-          const markName =
-            `astria-${Date.now()}-${markQueue.length}`;
-
-
-          if (
-
-            sendToTwilio({
-
-              event: 'mark',
-
-              streamSid,
-
-              mark: {
-                name:
-                  markName
-              }
-
-            })
-
-          ) {
-
-            markQueue.push(
-              markName
-            );
-
-          }
-
-        }
-
-
-        // ----------------------------------------------------
-        // CALLER INTERRUPTS AI
-        // ----------------------------------------------------
-
-        function handleCallerInterruption() {
-
-          if (
-
-            !streamSid ||
-
-            markQueue.length === 0
-
-          ) {
-
-            return;
-
-          }
-
-
-          // Clear queued Twilio AI audio
-          sendToTwilio({
-
-            event: 'clear',
-
-            streamSid
-
           });
 
-
-          // Truncate current OpenAI assistant audio
-          if (
-
-            lastAssistantItem &&
-
-            responseStartTimestampTwilio !==
-              null
-
-          ) {
-
-            const elapsedTime =
-              Math.max(
-
-                0,
-
-                Number(
-                  latestMediaTimestamp
-                ) -
-
-                Number(
-                  responseStartTimestampTwilio
-                )
-
-              );
-
-
-            sendToOpenAI({
-
-              type:
-                'conversation.item.truncate',
-
-              item_id:
-                lastAssistantItem,
-
-              content_index:
-                0,
-
-              audio_end_ms:
-                elapsedTime
-
-            });
-
-          }
-
-
-          markQueue = [];
-
-          lastAssistantItem = null;
-
-          responseStartTimestampTwilio =
-            null;
-
         }
 
 
         // ----------------------------------------------------
-        // OPENAI CONNECTED
+        // OPENAI READY
         // ----------------------------------------------------
 
-        openAiWs.on(
+        openai.on(
           'open',
+
           () => {
 
-            console.log(
-              'Connected to OpenAI Realtime API'
-            );
-
-
-            openAiConnected =
+            openAiStarted =
               true;
 
-
-            configureSession();
+            startSession();
 
           }
         );
@@ -1532,99 +804,67 @@ fastify.register(
         // OPENAI EVENTS
         // ----------------------------------------------------
 
-        openAiWs.on(
+        openai.on(
           'message',
-          rawData => {
 
-            try {
+          raw => {
 
-              const event =
-                JSON.parse(
-                  rawData.toString()
-                );
+            const event =
+              JSON.parse(
+                raw.toString()
+              );
 
 
-              // ----------------------------------------------
-              // SESSION READY
-              // ----------------------------------------------
+            // Session ready
+            if (
+              event.type ===
+              'session.updated'
+            ) {
 
-              if (
-                event.type ===
-                  'session.updated'
+              sessionReady =
+                true;
+
+
+              while (
+                pendingAudio.length
               ) {
 
-                sessionConfigured =
-                  true;
+                sendToOpenAI({
 
+                  type:
+                    'input_audio_buffer.append',
 
-                clearSessionTimer();
+                  audio:
+                    pendingAudio.shift()
 
-
-                console.log(
-
-                  `Astria AI session ready: ${selectedService.name}`
-
-                );
-
-
-                flushPendingAudio();
-
-
-                return;
+                });
 
               }
 
-
-              // ----------------------------------------------
-              // OPENAI AUDIO -> TWILIO
-              // ----------------------------------------------
-
-              if (
-
-                event.type ===
-                  'response.output_audio.delta' &&
-
-                event.delta
-
-              ) {
-
-                if (
-                  !streamSid
-                ) {
-
-                  return;
-
-                }
+            }
 
 
-                if (
+            // AI audio -> caller
+            if (
 
-                  responseStartTimestampTwilio ===
-                    null
+              event.type ===
+                'response.output_audio.delta' &&
 
-                ) {
+              event.delta &&
 
-                  responseStartTimestampTwilio =
-                    Number(
-                      latestMediaTimestamp
-                    ) || 0;
+              streamSid &&
 
-                }
+              socket.readyState ===
+                WebSocket.OPEN
 
+            ) {
 
-                if (
-                  event.item_id
-                ) {
+              socket.send(
 
-                  lastAssistantItem =
-                    event.item_id;
+                JSON.stringify({
 
-                }
-
-
-                sendToTwilio({
-
-                  event: 'media',
+                  event:
+                    'media',
 
                   streamSid,
 
@@ -1635,73 +875,34 @@ fastify.register(
 
                   }
 
-                });
+                })
 
-
-                sendMark();
-
-
-                return;
-
-              }
-
-
-              // ----------------------------------------------
-              // CALLER STARTS TALKING
-              // ----------------------------------------------
-
-              if (
-
-                event.type ===
-                  'input_audio_buffer.speech_started'
-
-              ) {
-
-                handleCallerInterruption();
-
-
-                return;
-
-              }
-
-
-              // ----------------------------------------------
-              // OPENAI ERROR
-              // ----------------------------------------------
-
-              if (
-                event.type ===
-                  'error'
-              ) {
-
-                console.error(
-
-                  'OpenAI Realtime error:',
-
-                  JSON.stringify(
-                    event
-                  )
-
-                );
-
-
-                closeForFallback(
-                  'OpenAI API error'
-                );
-
-              }
+              );
 
             }
 
-            catch (error) {
+
+            // If AI fails, leave the stream.
+            // Twilio then goes to /after-ai and voicemail.
+            if (
+              event.type ===
+              'error'
+            ) {
 
               console.error(
-
-                'Error processing OpenAI event:',
-
-                error
-
+                'OpenAI Realtime error:',
+                JSON.stringify(event)
               );
+
+
+              if (
+                socket.readyState ===
+                WebSocket.OPEN
+              ) {
+
+                socket.close();
+
+              }
 
             }
 
@@ -1710,232 +911,44 @@ fastify.register(
 
 
         // ----------------------------------------------------
-        // TWILIO MEDIA STREAM EVENTS
-        // ----------------------------------------------------
+        // OPENAI DISCONNECTED
+        // ============================================================
 
-        connection.on(
-          'message',
-          rawMessage => {
-
-            try {
-
-              const data =
-                JSON.parse(
-                  rawMessage.toString()
-                );
-
-
-              switch (
-                data.event
-              ) {
-
-
-                // --------------------------------------------
-                // STREAM START
-                // --------------------------------------------
-
-                case 'start': {
-
-                  streamSid =
-                    data.start?.streamSid ||
-                    data.streamSid;
-
-
-                  latestMediaTimestamp = 0;
-
-                  responseStartTimestampTwilio =
-                    null;
-
-                  lastAssistantItem = null;
-
-                  markQueue = [];
-
-
-                  const parameters =
-                    data.start?.customParameters ||
-                    {};
-
-
-                  selectedService =
-
-                    SERVICE_BY_KEY[
-                      parameters.service
-                    ] ||
-
-                    SERVICES['0'];
-
-
-                  twilioStarted = true;
-
-
-                  console.log(
-
-                    `Twilio stream started: ${streamSid}`
-
-                  );
-
-
-                  console.log(
-
-                    `Astria department: ${selectedService.name}`
-
-                  );
-
-
-                  configureSession();
-
-
-                  break;
-
-                }
-
-
-                // --------------------------------------------
-                // CALLER AUDIO
-                // --------------------------------------------
-
-                case 'media': {
-
-                  latestMediaTimestamp =
-                    Number(
-                      data.media?.timestamp ||
-                      0
-                    );
-
-
-                  const payload =
-                    data.media?.payload;
-
-
-                  if (
-                    !payload
-                  ) {
-
-                    break;
-
-                  }
-
-
-                  if (
-
-                    sessionConfigured &&
-
-                    openAiIsOpen()
-
-                  ) {
-
-                    sendToOpenAI({
-
-                      type:
-                        'input_audio_buffer.append',
-
-                      audio:
-                        payload
-
-                    });
-
-                  }
-
-                  else if (
-
-                    pendingAudio.length <
-                    MAX_PENDING_AUDIO_FRAMES
-
-                  ) {
-
-                    pendingAudio.push(
-                      payload
-                    );
-
-                  }
-
-
-                  break;
-
-                }
-
-
-                // --------------------------------------------
-                // TWILIO MARK COMPLETE
-                // --------------------------------------------
-
-                case 'mark': {
-
-                  if (
-                    markQueue.length > 0
-                  ) {
-
-                    markQueue.shift();
-
-                  }
-
-
-                  break;
-
-                }
-
-
-                // --------------------------------------------
-                // STREAM STOPPED
-                // --------------------------------------------
-
-                case 'stop': {
-
-                  console.log(
-                    'Twilio stream stopped'
-                  );
-
-
-                  break;
-
-                }
-
-
-                default:
-
-                  break;
-
-              }
-
-            }
-
-            catch (error) {
-
-              console.error(
-
-                'Error processing Twilio event:',
-
-                error
-
-              );
-
-            }
-
-          }
-        );
-
-
-        // ----------------------------------------------------
-        // CALLER DISCONNECTED
-        // ----------------------------------------------------
-
-        connection.on(
+        openai.on(
           'close',
+
           () => {
 
-            console.log(
-              'Caller disconnected'
+            if (
+              socket.readyState ===
+              WebSocket.OPEN
+            ) {
+
+              socket.close();
+
+            }
+
+          }
+        );
+
+
+        openai.on(
+          'error',
+
+          error => {
+
+            console.error(
+              'OpenAI WebSocket error:',
+              error.message
             );
-
-
-            clearSessionTimer();
 
 
             if (
-              openAiIsOpen()
+              socket.readyState ===
+              WebSocket.OPEN
             ) {
 
-              openAiWs.close();
+              socket.close();
 
             }
 
@@ -1944,69 +957,110 @@ fastify.register(
 
 
         // ----------------------------------------------------
-        // TWILIO ERROR
+        // TWILIO EVENTS
         // ----------------------------------------------------
 
-        connection.on(
-          'error',
-          error => {
+        socket.on(
+          'message',
 
-            console.error(
+          raw => {
 
-              'Twilio WebSocket error:',
+            const data =
+              JSON.parse(
+                raw.toString()
+              );
 
-              error
 
-            );
+            // Stream starts
+            if (
+              data.event ===
+              'start'
+            ) {
+
+              streamSid =
+                data.start.streamSid;
+
+
+              selectedService =
+
+                SERVICE_BY_KEY[
+                  data.start
+                    .customParameters
+                    ?.service
+                ] ||
+
+                SERVICES['0'];
+
+
+              twilioStarted =
+                true;
+
+
+              startSession();
+
+            }
+
+
+            // Caller audio -> OpenAI
+            if (
+
+              data.event ===
+                'media' &&
+
+              data.media?.payload
+
+            ) {
+
+              if (
+                sessionReady
+              ) {
+
+                sendToOpenAI({
+
+                  type:
+                    'input_audio_buffer.append',
+
+                  audio:
+                    data.media.payload
+
+                });
+
+              }
+
+              else if (
+                pendingAudio.length <
+                150
+              ) {
+
+                pendingAudio.push(
+                  data.media.payload
+                );
+
+              }
+
+            }
 
           }
         );
 
 
         // ----------------------------------------------------
-        // OPENAI CLOSED
+        // CALL ENDS
         // ----------------------------------------------------
 
-        openAiWs.on(
+        socket.on(
           'close',
-          (
-            code,
-            reason
-          ) => {
 
-            console.log(
+          () => {
 
-              `Disconnected from OpenAI Realtime API: ${code} ${reason?.toString?.() || ''}`
+            if (
+              openai.readyState ===
+              WebSocket.OPEN
+            ) {
 
-            );
+              openai.close();
 
-
-            clearSessionTimer();
-
-          }
-        );
-
-
-        // ----------------------------------------------------
-        // OPENAI ERROR
-        // ----------------------------------------------------
-
-        openAiWs.on(
-          'error',
-          error => {
-
-            console.error(
-
-              'OpenAI WebSocket error:',
-
-              error
-
-            );
-
-
-            closeForFallback(
-              'OpenAI WebSocket error'
-            );
+            }
 
           }
         );
@@ -2020,10 +1074,10 @@ fastify.register(
 
 
 // ============================================================
-// START SERVER
+// RAILWAY SERVER
 // ============================================================
 
-fastify.listen(
+app.listen(
 
   {
 
@@ -2035,28 +1089,23 @@ fastify.listen(
 
   },
 
-  err => {
+  error => {
 
     if (
-      err
+      error
     ) {
 
       console.error(
-        err
+        error
       );
 
-
-      process.exit(
-        1
-      );
+      process.exit(1);
 
     }
 
 
     console.log(
-
-      `Astria AI Voice V5 English Master is listening on port ${PORT}`
-
+      `Astria AI Voice V6 is listening on port ${PORT}`
     );
 
   }
