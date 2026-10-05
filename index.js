@@ -13,38 +13,25 @@ app.register(formbody);
 app.register(fastifyWs);
 
 const PORT = Number(process.env.PORT || 5050);
-const MODEL = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime';
+const MODEL = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-1.5';
 const MENU_VOICE = 'Google.en-US-Chirp3-HD-Aoede';
 const AI_VOICE = 'shimmer';
+const AI_SPEED = 0.72;
 
 const SERVICES = {
-  '1': ['Aviation',
-    'Astria advances global mobility and aviation opportunities. We work across airlines, airports, mobility, and aviation services, helping organizations build strategic alliances, expand market access, and connect with partners across international markets. Through industry relationships and commercial insight, Astria supports business development and long-term growth across the aviation ecosystem.'
-  ],
+  '1': ['Aviation', 'Astria advances global mobility and aviation opportunities. We work across airlines, airports, mobility, and aviation services, helping organizations build strategic alliances, expand market access, and connect with partners across international markets. Through industry relationships and commercial insight, Astria supports business development and long-term growth across the aviation ecosystem.'],
 
-  '2': ['Space and Aerospace',
-    'Astria connects innovation and infrastructure for the future. Our work spans commercial space, satellites and infrastructure, advanced manufacturing, and global partnerships. We help organizations identify strategic relationships, explore new markets, and build connections across the international space and aerospace ecosystem.'
-  ],
+  '2': ['Space and Aerospace', 'Astria connects innovation and infrastructure for the future. Our work spans commercial space, satellite and infrastructure opportunities, advanced manufacturing, and global partnerships. We help organizations identify strategic relationships, explore new markets, and build connections across the international space and aerospace ecosystem.'],
 
-  '3': ['AI Technology',
-    'Astria helps organizations explore enterprise AI, AI automation, AI integration, and emerging technology partnerships. We connect businesses with technology opportunities and strategic partners that can support practical applications, transformation, and long-term growth.'
-  ],
+  '3': ['AI Technology', 'Astria empowers businesses through intelligent solutions. Our AI technology work includes enterprise AI, AI automation, AI integration, and emerging technology partnerships. We help organizations explore practical applications, connect with technology partners, and identify opportunities for business transformation and growth.'],
 
-  '4': ['Sports Hospitality',
-    'Astria develops premium sports hospitality and major-event opportunities, including corporate experiences and strategic partnerships. We help organizations build relationships, strengthen engagement, and access high-value opportunities around major sporting events.'
-  ],
+  '4': ['Sports Hospitality', 'Astria creates unforgettable experiences that bring people together. Our sports hospitality work includes premium hospitality, major sporting events, corporate experiences, and strategic partnerships. We connect organizations with opportunities that support relationship building, brand engagement, and high-value experiences around major events.'],
 
-  '5': ['Government Procurement Services',
-    'Astria assists businesses with government supplier and vendor registration, application preparation and submission, and basic supplemental-document follow-up. We help companies navigate the administrative requirements of government procurement participation. Astria does not guarantee approvals, awards, or contracts, and does not provide legal or tax services.'
-  ],
+  '5': ['Government Procurement Services', 'Astria Government Procurement Services assists companies with supplier and vendor registration, application preparation and submission, and basic supplemental-document follow-up. We help businesses navigate registration and administrative requirements for government procurement participation. Astria does not guarantee approvals, awards, or contracts, and legal or tax services are not included.'],
 
-  '6': ['Business Cooperation',
-    'Astria helps organizations identify growth opportunities, build strategic partnerships, enter new markets, and connect with decision-makers and resources across industries and borders. Our work includes business development, strategic partnerships, global market access, and commercial advisory, combining a New York perspective with global relationships.'
-  ],
+  '6': ['Business Cooperation', 'Astria helps organizations identify growth opportunities, form strategic partnerships, enter new markets, and connect with decision-makers and resources across industries and borders. Our work includes business development, strategic partnerships, global market access, and commercial advisory. We combine a New York perspective with global relationships to support international expansion and long-term value creation.'],
 
-  '8': ['General Assistance',
-    'Astria connects innovation, capital, talent, organizations, and opportunities across aviation, space and aerospace, AI technology, sports hospitality, government procurement, and international business cooperation. We help partners build strategic relationships, explore new markets, and pursue long-term growth.'
-  ]
+  '8': ['General Assistance', 'Astria connects organizations, ideas, and opportunities across aviation, space and aerospace, AI technology, sports hospitality, government procurement services, and business cooperation. Through global relationships, industry insight, and strategic collaboration, we help partners explore new markets, build meaningful connections, and create long-term value.']
 };
 
 const host = r =>
@@ -56,14 +43,14 @@ const host = r =>
 
 const esc = s =>
   String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&apos;');
 
 const say = s =>
-  `<Say voice="${MENU_VOICE}" language="en-US"><prosody rate="85%">${esc(s)}</prosody></Say>`;
+  `<Say voice="${MENU_VOICE}" language="en-US"><prosody rate="84%">${esc(s)}</prosody></Say>`;
 
 function menu(r) {
   const h = host(r);
@@ -80,13 +67,13 @@ function menu(r) {
     'For General Assistance, press 8. ' +
     'To hear this menu again, press 9.';
 
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="6" action="https://${h}/menu" method="POST" actionOnEmptyResult="true">${say(text)}</Gather></Response>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="dtmf" numDigits="1" timeout="5" action="https://${h}/menu" method="POST">${say(text)}</Gather><Redirect method="POST">https://${h}/incoming-call</Redirect></Response>`;
 }
 
-function connect(r, digit) {
+function connect(r, d) {
   const h = host(r);
 
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Connect action="https://${h}/incoming-call" method="POST"><Stream url="wss://${h}/media-stream"><Parameter name="service" value="${digit}"/></Stream></Connect></Response>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Connect><Stream url="wss://${h}/media-stream"><Parameter name="service" value="${d}"/></Stream></Connect></Response>`;
 }
 
 function voicemail(r) {
@@ -97,44 +84,20 @@ function voicemail(r) {
   )}<Record action="https://${h}/voicemail-done" method="POST" maxLength="120" playBeep="true"/></Response>`;
 }
 
-function prompt(service) {
-  return `
-You are Astria's professional AI telephone assistant for ${service[0]}.
-
-Speak with a warm, gentle, calm and polished premium airline service style.
-Speak slowly and clearly.
-
-Use only this verified business information:
-${service[1]}
-
-Never invent partnerships, contracts, awards, approvals,
-prices, availability, certifications, legal conclusions,
-tax conclusions, or guaranteed outcomes.
-
-There is no live transfer to a personal telephone.
-
-If the caller asks for a human or representative,
-explain that consultation volume is currently high
-and the Astria team can follow up by phone or email.
-The caller may also select option 7 from the main menu
-to leave a voice message.
-
-Email: info@goastria.com
-Website: https://www.goastria.com
-Telephone: +1-888-987-8767
-`;
+function prompt(s) {
+  return `You are Astria's professional AI telephone assistant for ${s[0]}. Speak warmly, gently, calmly and professionally, like premium international airline service. Speak slowly and clearly. Use only this verified business information: ${s[1]} Never invent partnerships, contracts, awards, approvals, pricing, availability, certifications, legal conclusions, tax conclusions, or guaranteed results. There is no live transfer to a personal phone. If the caller asks for a human, representative, agent or customer service, explain that consultation volume is currently high; the Astria team can follow up by phone or email; and the caller may use option 7 on the main menu to leave a voice message. Contact: info@goastria.com, https://www.goastria.com, +1-888-987-8767.`;
 }
 
 app.get('/', async () => ({
   status: 'ok',
-  version: 'Astria Fresh Master'
+  version: 'Astria Fresh Master V1'
 }));
 
-app.all('/incoming-call', async (r, p) =>
+app.all('/incoming-call', async (r,p) =>
   p.type('text/xml').send(menu(r))
 );
 
-app.all('/menu', async (r, p) => {
+app.all('/menu', async (r,p) => {
   const d = String(
     r.body?.Digits ??
     r.query?.Digits ??
@@ -149,10 +112,15 @@ app.all('/menu', async (r, p) => {
 
   return p
     .type('text/xml')
-    .send(connect(r, SERVICES[d] ? d : '8'));
+    .send(
+      connect(
+        r,
+        SERVICES[d] ? d : '8'
+      )
+    );
 });
 
-app.all('/voicemail-done', async (r, p) =>
+app.all('/voicemail-done', async (r,p) =>
   p.type('text/xml').send(
     `<?xml version="1.0" encoding="UTF-8"?><Response>${say(
       'Thank you. Your message has been received. A member of the Astria team will follow up with you. Goodbye.'
@@ -165,13 +133,15 @@ app.register(async server => {
     '/media-stream',
     { websocket: true },
 
-    connection => {
+    socket => {
       let streamSid = null;
       let service = SERVICES['8'];
+
       let twilioReady = false;
       let aiReady = false;
       let configured = false;
       let introSent = false;
+      let introFinished = false;
 
       const ai = new WebSocket(
         `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(MODEL)}`,
@@ -211,7 +181,12 @@ app.register(async server => {
                 },
 
                 turn_detection: {
-                  type: 'server_vad'
+                  type: 'server_vad',
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 650,
+                  create_response: false,
+                  interrupt_response: false
                 }
               },
 
@@ -221,8 +196,7 @@ app.register(async server => {
                 },
 
                 voice: AI_VOICE,
-
-                speed: 0.75
+                speed: AI_SPEED
               }
             }
           }
@@ -236,7 +210,9 @@ app.register(async server => {
 
       ai.on('message', raw => {
         const e =
-          JSON.parse(raw.toString());
+          JSON.parse(
+            raw.toString()
+          );
 
         if (
           e.type === 'session.updated' &&
@@ -245,35 +221,26 @@ app.register(async server => {
           introSent = true;
 
           sendAI({
-            type: 'conversation.item.create',
+            type: 'response.create',
 
-            item: {
-              type: 'message',
-              role: 'user',
+            response: {
+              input: [],
 
-              content: [{
-                type: 'input_text',
+              output_modalities: ['audio'],
 
-                text:
-                  `Read this full Astria business introduction naturally and do not shorten it: ${service[1]} Then ask exactly: How may I assist you today?`
-              }]
+              instructions:
+                `Say exactly this full Astria business introduction. Do not shorten, repeat, or paraphrase it. Speak slowly and warmly. After it, say exactly: How may I assist you today?\n\n${service[1]}`
             }
-          });
-
-          sendAI({
-            type: 'response.create'
           });
         }
 
         if (
-          e.type ===
-            'response.output_audio.delta' &&
+          e.type === 'response.output_audio.delta' &&
           e.delta &&
           streamSid &&
-          connection.readyState ===
-            WebSocket.OPEN
+          socket.readyState === WebSocket.OPEN
         ) {
-          connection.send(
+          socket.send(
             JSON.stringify({
               event: 'media',
               streamSid,
@@ -285,29 +252,59 @@ app.register(async server => {
           );
         }
 
+        if (
+          e.type === 'response.done' &&
+          introSent &&
+          !introFinished
+        ) {
+          introFinished = true;
+
+          sendAI({
+            type: 'session.update',
+
+            session: {
+              type: 'realtime',
+
+              audio: {
+                input: {
+                  turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.5,
+                    prefix_padding_ms: 300,
+                    silence_duration_ms: 650,
+                    create_response: true,
+                    interrupt_response: true
+                  }
+                }
+              }
+            }
+          });
+        }
+
         if (e.type === 'error')
           console.error(
-            'OpenAI:',
+            'OpenAI Realtime error:',
             JSON.stringify(e)
           );
       });
 
-      connection.on('message', raw => {
+      socket.on('message', raw => {
         const d =
-          JSON.parse(raw.toString());
+          JSON.parse(
+            raw.toString()
+          );
 
         if (d.event === 'start') {
           streamSid =
-            d.start.streamSid;
+            d.start?.streamSid;
 
           service =
             SERVICES[
-              d.start.customParameters?.service
+              d.start?.customParameters?.service
             ] ||
             SERVICES['8'];
 
           twilioReady = true;
-
           configure();
         }
 
@@ -326,17 +323,22 @@ app.register(async server => {
         }
       });
 
-      connection.on('close', () => {
-        if (ai.readyState === WebSocket.OPEN)
+      socket.on('close', () => {
+        if (
+          ai.readyState ===
+          WebSocket.OPEN
+        ) {
           ai.close();
+        }
       });
 
       ai.on('close', () => {
         if (
-          connection.readyState ===
+          socket.readyState ===
           WebSocket.OPEN
-        )
-          connection.close();
+        ) {
+          socket.close();
+        }
       });
 
       ai.on('error', e =>
@@ -362,7 +364,7 @@ app.listen(
     }
 
     console.log(
-      `Astria Fresh Master listening on ${PORT}`
+      `Astria Fresh Master V1 listening on ${PORT}`
     );
   }
 );
