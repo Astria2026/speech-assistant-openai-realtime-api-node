@@ -15,7 +15,7 @@ app.register(fastifyWs);
 const PORT = Number(process.env.PORT || 5050);
 const MODEL = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-1.5';
 const MENU_VOICE = 'Google.en-US-Chirp3-HD-Aoede';
-const AI_VOICE = 'cedar';
+const AI_VOICE = 'marin';
 const AI_SPEED = 0.78;
 
 const SERVICES = {
